@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Micro Mouse</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        #maze-container {
+            display: grid;
+            grid-template-columns: repeat(10, 30px);
+            gap: 2px;
+        }
+
+        .cell {
+            width: 30px;
+            height: 30px;
+            border: 1px solid #000;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        .wall {
+            background-color: #000;
+        }
+
+        .mouse {
+            background-color: #ccc; /* Cor cinza para o rato */
+        }
+
+        .goal {
+            background-color: #0f0; /* Cor verde para os quadrados centrais */
+        }
+
+        .path {
+            background-color: #00f; /* Cor azul para o melhor caminho */
+        }
+
+        .explored {
+            background-color: #f00; /* Cor vermelha para caminhos explorados */
+        }
+
+        .arrow {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-bottom: 10px solid #000; /* Cor da seta */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(0deg);
+            transition: transform 0.5s ease; /* Adiciona uma transição suave para a rotação */
+        }
+    </style>
+</head>
+<body>
+
+<div id="maze-container"></div>
+
+<script>
+    // Função para gerar um número aleatório entre 0 e 1
+    function random() {
+        return Math.random();
+    }
+
+    // Função para gerar um mapa aleatório
+    function generateRandomMaze(rows, cols, wallProbability) {
+        const maze = [];
+        for (let i = 0; i < rows; i++) {
+            maze.push([]);
+            for (let j = 0; j < cols; j++) {
+                maze[i].push(random() < wallProbability ? 1 : 0);
+            }
+        }
+        maze[0][0] = 0;  // Garante que não haja uma parede no topo esquerdo
+        return maze;
+    }
+
+    // Função para renderizar o mapa na tela
+    function renderMaze(maze, mousePosition, goalPositions, bestPath, direction, explored) {
+        const mazeContainer = document.getElementById('maze-container');
+        mazeContainer.innerHTML = '';
+
+        for (let i = 0; i < maze.length; i++) {
+            for (let j = 0; j < maze[i].length; j++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                if (maze[i][j] === 1) {
+                    cell.classList.add('wall');
+                }
+                if (mousePosition && mousePosition.x === i && mousePosition.y === j) {
+                    cell.classList.add('mouse');
+                    renderArrow(cell, direction);
+                }
+                if (goalPositions.some(pos => pos.x === i && pos.y === j)) {
+                    cell.classList.add('goal');
+                }
+                if (
+                    bestPath &&
+                    bestPath.length > 0 &&
+                    mousePosition &&
+                    mousePosition.x === goalPositions[goalPositions.length - 1].x &&
+                    mousePosition.y === goalPositions[goalPositions.length - 1].y
+                ) {
+                    // Adiciona a classe 'path' apenas quando o rato atinge o centro
+                    cell.classList.add('path');
+                }
+                if (explored.some(pos => pos.x === i && pos.y === j)) {
+                    // Adiciona a classe 'explored' para caminhos explorados
+                    cell.classList.add('explored');
+                }
+                mazeContainer.appendChild(cell);
+            }
+        }
+    }
+
+    // Função para renderizar a seta na direção correta
+    function renderArrow(cell, direction) {
+        const arrow = document.createElement('div');
+        arrow.className = 'arrow';
+        arrow.style.transform = `translate(-50%, -50%) rotate(${getRotationAngle(direction)}deg)`;
+        cell.appendChild(arrow);
+    }
+
+    // Função para obter o ângulo de rotação da seta com base na direção
+    function getRotationAngle(direction) {
+        switch (direction) {
+            case 'up':
+                return 0;
+            case 'right':
+                return 90;
+            case 'down':
+                return 180;
+            case 'left':
+                return -90;
+            default:
+                return 0;
+        }
+    }
+
+    // Função para encontrar o melhor caminho
+    function findBestPath(rows, cols) {
+        const path = [];
+        for (let i = 0; i < rows; i++) {
+            for (let j = 0; j < cols; j++) {
+                path.push({ x: i, y: j });
+            }
+        }
+        return path;
+    }
+
+    // Função para virar o rato
+    function turn(direction, currentDirection) {
+        const directions = ['up', 'right', 'down', 'left'];
+        const currentIndex = directions.indexOf(currentDirection);
+
+        switch (direction) {
+            case 'right':
+                return directions[(currentIndex + 1) % 4];
+            case 'left':
+                return directions[(currentIndex + 3) % 4];
+            default:
+                return currentDirection;
+        }
+    }
+
+    // Tamanho do labirinto
+    const rows = 10;
+    const cols = 10;
+
+    // Probabilidade de uma célula ser uma parede
+    const wallProbability = 0.2;
+
+    // Gera um mapa aleatório
+    const maze = generateRandomMaze(rows, cols, wallProbability);
+
+    // Quadrados centrais
+    const goalPositions = [
+        { x: Math.floor(rows / 2) - 1, y: Math.floor(cols / 2) - 1 },
+        { x: Math.floor(rows / 2) - 1, y: Math.floor(cols / 2) },
+        { x: Math.floor(rows / 2), y: Math.floor(cols / 2) - 1 },
+        { x: Math.floor(rows / 2), y: Math.floor(cols / 2) }
+    ];
+
+    // Encontra o melhor caminho
+    const bestPath = findBestPath(rows, cols);
+
+    // Armazena os caminhos explorados
+    const explored = [];
+
+    // Inicializa as posições do rato
+    let mouseX = 0;
+    let mouseY = 0;
+    let direction = 'right';
+    let forwardDistance = 1;
+
+    // Atualiza dinamicamente o rato a cada meio segundo
+    let currentIndex = 0;
+    let turns = 0;
+    setInterval(() => {
+        renderMaze(maze, { x: mouseX, y: mouseY }, goalPositions, bestPath, direction, explored);
+
+        // Verifica se o rato atingiu um dos quadrados centrais
+        if (goalPositions.some(pos => pos.x === mouseX && pos.y === mouseY)) {
+            alert(`O rato encontrou o caminho em ${turns} voltas!`);
+            turns = 0;  // Reinicia o contador de voltas
+        } else {
+            // Movimento do rato (para frente, direita, esquerda ou para trás)
+            const distanceX = goalPositions[goalPositions.length - 1].x - mouseX;
+            const distanceY = goalPositions[goalPositions.length - 1].y - mouseY;
+
+            // Calcula a próxima posição do rato
+            let nextX, nextY;
+
+            if (distanceX > 0 && !maze[mouseX + 1][mouseY] && !explored.some(pos => pos.x === mouseX + 1 && pos.y === mouseY)) {
+                nextX = mouseX + 1;
+                nextY = mouseY;
+            } else if (distanceX < 0 && !maze[mouseX - 1][mouseY] && !explored.some(pos => pos.x === mouseX - 1 && pos.y === mouseY)) {
+                nextX = mouseX - 1;
+                nextY = mouseY;
+            } else if (distanceY > 0 && !maze[mouseX][mouseY + 1] && !explored.some(pos => pos.x === mouseX && pos.y === mouseY + 1)) {
+                nextX = mouseX;
+                nextY = mouseY + 1;
+            } else if (distanceY < 0 && !maze[mouseX][mouseY - 1] && !explored.some(pos => pos.x === mouseX && pos.y === mouseY - 1)) {
+                nextX = mouseX;
+                nextY = mouseY - 1;
+            }
+
+            if (nextX !== undefined && nextY !== undefined) {
+                mouseX = nextX;
+                mouseY = nextY;
+
+                // Adiciona a posição aos caminhos explorados
+                explored.push({ x: mouseX, y: mouseY });
+            } else {
+                // Se encontrar uma parede ou caminho explorado, vira em direção ao centro
+                direction = turn('left', direction);
+            }
+
+            // Atualiza o índice do caminho
+            currentIndex = (currentIndex + 1) % bestPath.length;
+            turns++;
+        }
+    }, 500);  // Intervalo ajustado para 500 milissegundos
+</script>
+
+</body>
+</html>
